@@ -1,29 +1,19 @@
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.ArrayList;
 
-// 1. CLASE ESTRUCTURAL DE DATOS
-class VectorMulti {
-    double d1, d2, x, y, r, angulo;
-    String tipoOriginal;
-
-    public VectorMulti(double d1, double d2, double x, double y, double r, double angulo, String tipoOriginal) {
-        this.d1 = d1;
-        this.d2 = d2;
-        this.x = x;
-        this.y = y;
-        this.r = r;
-        this.angulo = angulo;
-        this.tipoOriginal = tipoOriginal;
-    }
-}
-
-// 3. CLASE PRINCIPAL (Lógica de Interfaz y Reportes)
+// 3. CLASE PRINCIPAL (Lógica de Interfaz y Reportes - Refactorizada a
+// Dashboard)
 public class programa extends JFrame {
     private JTextField txtDato1, txtDato2;
     private JComboBox<String> cmbTipoEntrada;
     private LienzoMulti panelGrafico;
     private ArrayList<VectorMulti> listaVectores;
+
+    // Componentes del nuevo layout Dashboard
+    private JSplitPane splitPane;
+    private JTextArea areaReporte;
 
     // Banderas y Constructores Modulares del Reporte
     private StringBuilder reporteIngresos;
@@ -39,76 +29,152 @@ public class programa extends JFrame {
         reporteSuma = new StringBuilder();
         reporteProducto = new StringBuilder();
 
-        setTitle("Calculador y Analizador de Vectores");
-        setSize(1050, 750);
+        setTitle("Dashboard - Calculador y Analizador de Vectores");
+        setSize(1200, 750); // Ligeramente más ancho para acomodar el menú lateral
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+
+        // 1. ARQUITECTURA PRINCIPAL: BorderLayout
         setLayout(new BorderLayout());
 
-        JPanel panelControl = new JPanel();
-        panelControl.setBackground(new Color(245, 246, 248));
-        panelControl.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        // =========================================================
+        // 2. PANEL SUPERIOR (NORTH) - Ingreso de Datos
+        // =========================================================
+        JPanel panelNorte = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 15));
+        panelNorte.setBackground(new Color(245, 246, 248));
+        panelNorte.setBorder(new EmptyBorder(5, 10, 5, 10));
 
         cmbTipoEntrada = new JComboBox<>(new String[] { "Rectangulares (X, Y)", "Polares (M, A)" });
-        txtDato1 = new JTextField(5);
-        txtDato2 = new JTextField(5);
+        txtDato1 = new JTextField(7);
+        txtDato2 = new JTextField(7);
 
-        JButton btnAgregar = new JButton("Ingreso / Gráfica");
-        btnAgregar.setBackground(new Color(40, 167, 69));
+        JButton btnAgregar = new JButton("Agregar Vector");
+        btnAgregar.setBackground(new Color(40, 167, 69)); // Verde #28a745
         btnAgregar.setForeground(Color.WHITE);
-
-        JButton btnSumar = new JButton("Sumar Vectores");
-        btnSumar.setBackground(new Color(23, 162, 184));
-        btnSumar.setForeground(Color.WHITE);
-
-        JButton btnPunto = new JButton("Producto Escalar");
-        btnPunto.setBackground(new Color(111, 66, 193));
-        btnPunto.setForeground(Color.WHITE);
-
-        JButton btnReporte = new JButton("Reporte Ejecutivo");
-        btnReporte.setBackground(new Color(0, 123, 255));
-        btnReporte.setForeground(Color.WHITE);
-
+        btnAgregar.setFocusPainted(false);
+        btnAgregar.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btnAgregar.setOpaque(true);
+        btnAgregar.setBorderPainted(false);
         JButton btnLimpiar = new JButton("Limpiar Lienzo");
         btnLimpiar.setBackground(Color.WHITE);
-        btnLimpiar.setForeground(Color.RED);
+        btnLimpiar.setForeground(new Color(220, 53, 69)); // Rojo #dc3545
+        btnLimpiar.setFocusPainted(false);
+        btnLimpiar.setFont(new Font("SansSerif", Font.BOLD, 12));
 
-        panelControl.add(new JLabel("Tipo:"));
-        panelControl.add(cmbTipoEntrada);
-        panelControl.add(new JLabel(" D1:"));
-        panelControl.add(txtDato1);
-        panelControl.add(new JLabel(" D2:"));
-        panelControl.add(txtDato2);
+        panelNorte.add(new JLabel("Tipo:"));
+        panelNorte.add(cmbTipoEntrada);
+        panelNorte.add(new JLabel(" D1:"));
+        panelNorte.add(txtDato1);
+        panelNorte.add(new JLabel(" D2:"));
+        panelNorte.add(txtDato2);
+        panelNorte.add(btnAgregar);
+        panelNorte.add(btnLimpiar);
 
-        panelControl.add(btnAgregar);
-        panelControl.add(btnSumar);
-        panelControl.add(btnPunto);
-        panelControl.add(btnReporte);
-        panelControl.add(btnLimpiar);
+        add(panelNorte, BorderLayout.NORTH);
 
-        add(panelControl, BorderLayout.NORTH);
-        panelGrafico = new LienzoMulti(listaVectores);
-        add(panelGrafico, BorderLayout.CENTER);
+        // =========================================================
+        // 3. PANEL LATERAL IZQUIERDO (WEST) - Menú Principal
+        // =========================================================
+        JPanel panelMenu = new JPanel();
+        panelMenu.setLayout(new BoxLayout(panelMenu, BoxLayout.Y_AXIS));
+        panelMenu.setPreferredSize(new Dimension(220, 0));
+        panelMenu.setBackground(new Color(33, 37, 41)); // Gris muy oscuro #212529
+        panelMenu.setBorder(new EmptyBorder(20, 10, 20, 10));
 
-        // Eventos
+        JLabel lblMenu = new JLabel("MENÚ PRINCIPAL");
+        lblMenu.setForeground(Color.WHITE);
+        lblMenu.setFont(new Font("SansSerif", Font.BOLD, 16));
+        lblMenu.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Estilización y creación de los botones del menú (Flat Design)
+        // JButton btnHistorial = crearBotonMenu("Historial Ingresos", new Color(52, 58,
+        // 64)); // Gris oscuro
+        JButton btnSumar = crearBotonMenu("Sumar Vectores", new Color(23, 162, 184)); // Cyan/Celeste
+        JButton btnPunto = crearBotonMenu("Producto Escalar", new Color(111, 66, 193)); // Morado
+        JButton btnReporte = crearBotonMenu("Reporte Ejecutivo", new Color(52, 58, 64)); // Gris oscuro
+
+        panelMenu.add(lblMenu);
+        panelMenu.add(Box.createRigidArea(new Dimension(0, 30))); // Espaciador
+        // panelMenu.add(btnHistorial);
+        // panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
+        panelMenu.add(btnSumar);
+        panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
+        panelMenu.add(btnPunto);
+        panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
+        panelMenu.add(btnReporte);
+
+        add(panelMenu, BorderLayout.WEST);
+
+        // =========================================================
+        // 4. ÁREA CENTRAL (CENTER) - JSplitPane
+        // =========================================================
+        panelGrafico = new LienzoMulti(listaVectores); // Lienzo superior
+
+        areaReporte = new JTextArea();
+        areaReporte.setEditable(false);
+        areaReporte.setFont(new Font("Monospaced", Font.PLAIN, 13));
+        areaReporte.setLineWrap(true);
+        areaReporte.setWrapStyleWord(true);
+        areaReporte.setBackground(new Color(250, 250, 250));
+
+        JScrollPane scrollReporte = new JScrollPane(areaReporte); // Text area inferior
+        scrollReporte.setBorder(BorderFactory.createTitledBorder("Panel de Reportes"));
+
+        splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, panelGrafico, scrollReporte);
+        splitPane.setContinuousLayout(true);
+        splitPane.setOneTouchExpandable(true);
+        splitPane.setDividerSize(10);
+        splitPane.setBorder(null);
+
+        add(splitPane, BorderLayout.CENTER);
+
+        // Posicionar el divisor del JSplitPane casi al fondo una vez que la UI cargue
+        SwingUtilities.invokeLater(() -> splitPane.setDividerLocation(0.95));
+
+        // =========================================================
+        // EVENTOS (Listeners)
+        // =========================================================
         btnAgregar.addActionListener(e -> procesarDatos());
         btnSumar.addActionListener(e -> realizarSuma());
         btnPunto.addActionListener(e -> calcularProductoEscalar());
         btnReporte.addActionListener(e -> mostrarReporteDinamico());
 
+        // Historial Ingresos puede simplemente abrir el panel inferior
+        // btnHistorial.addActionListener(e -> mostrarReporteDinamico());
+
         btnLimpiar.addActionListener(e -> {
             listaVectores.clear();
-
-            // Reiniciar banderas y constructores
             reporteIngresos = new StringBuilder("--- HISTORIAL DE VECTORES AGREGADOS ---\n\n");
             reporteSuma.setLength(0);
             reporteProducto.setLength(0);
             flagSuma = false;
             flagProducto = false;
-
+            areaReporte.setText("");
             panelGrafico.repaint();
+
+            // Colapsar el panel de reportes suavemente
+            splitPane.setDividerLocation(0.95);
         });
     }
+
+    // Método auxiliar para estilizar botones laterales flat
+    private JButton crearBotonMenu(String texto, Color fondo) {
+        JButton btn = new JButton(texto);
+        btn.setBackground(fondo);
+        btn.setForeground(Color.WHITE);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 13));
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setOpaque(true);
+        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        return btn;
+    }
+
+    // =========================================================
+    // MÉTODOS ORIGINALES (NO MODIFICADOS)
+    // =========================================================
 
     private void procesarDatos() {
         try {
@@ -119,8 +185,6 @@ public class programa extends JFrame {
             int n = listaVectores.size() + 1;
 
             int modoSeleccionado = cmbTipoEntrada.getSelectedIndex();
-            // panelGrafico.setModoVisualizacion(modoSeleccionado);// esta linea no es
-            // necesaria
 
             if (modoSeleccionado == 0) { // RECTANGULARES (X, Y)
                 x = d1;
@@ -412,13 +476,14 @@ public class programa extends JFrame {
         reporteProducto.append(texto);
         flagProducto = true;
 
-        // Mensaje breve indicando al usuario que abra el reporte
         JOptionPane.showMessageDialog(this,
-                "Producto escalar calculado.\nPor favor, abra el 'Reporte Ejecutivo' para ver los detalles.",
+                "Producto escalar calculado.\nPor favor, haga clic en 'Reporte Ejecutivo' para ver los detalles.",
                 "Operación Exitosa", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // Método de Compilación Modular
+    // =========================================================
+    // MODIFICADO: Ahora carga el texto en el JTextArea central
+    // =========================================================
     private void mostrarReporteDinamico() {
         StringBuilder reporteFinal = new StringBuilder();
 
@@ -435,28 +500,22 @@ public class programa extends JFrame {
             reporteFinal.append(reporteProducto.toString());
         }
 
-        mostrarVentanaIndependiente("Reporte Ejecutivo Consolidado", reporteFinal.toString());
-    }
+        // Cargar texto en el área inferior del Dashboard
+        areaReporte.setText(reporteFinal.toString());
+        areaReporte.setCaretPosition(0);
 
-    private void mostrarVentanaIndependiente(String titulo, String contenido) {
-        JTextArea area = new JTextArea(contenido);
-        area.setEditable(false);
-        area.setFont(new Font("Monospaced", Font.PLAIN, 13));
-        area.setLineWrap(true);
-        area.setWrapStyleWord(true);
-        area.setCaretPosition(0);
-
-        JScrollPane scroll = new JScrollPane(area);
-        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-
-        JDialog win = new JDialog(this, titulo, false);
-        win.setSize(750, 500);
-        win.add(scroll);
-        win.setLocationRelativeTo(this);
-        win.setVisible(true);
+        // Animación sencilla para levantar el divisor (ocupa el 60% de la pantalla para
+        // gráfica, 40% reporte)
+        splitPane.setDividerLocation(0.6);
     }
 
     public static void main(String[] args) {
+        // Establecer un look and feel más moderno si está disponible
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {
+        }
+
         SwingUtilities.invokeLater(() -> new programa().setVisible(true));
     }
 }

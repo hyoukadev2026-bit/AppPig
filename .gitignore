@@ -1,0 +1,7 @@
+# Ignorar archivos compilados de Java
+*.class
+
+# Ignorar carpetas de configuración de editores (opcional pero recomendado)
+.vscode/
+.idea/
+*.iml

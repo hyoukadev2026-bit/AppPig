@@ -29,7 +29,7 @@ public class programa extends JFrame {
         reporteSuma = new StringBuilder();
         reporteProducto = new StringBuilder();
 
-        setTitle("Dashboard - Calculador y Analizador de Vectores");
+        setTitle("Analizador de Vectores");
         setSize(1200, 750); // Ligeramente más ancho para acomodar el menú lateral
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);

@@ -3,8 +3,21 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.ArrayList;
 
-// 3. CLASE PRINCIPAL (Lógica de Interfaz y Reportes - Refactorizada a
-// Dashboard)
+// Imports para exportación a PDF (Requiere la librería OpenPDF o iText)
+import com.lowagie.text.Document;
+import com.lowagie.text.Element;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.Image;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.pdf.PdfWriter;
+import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+
+// 3. CLASE PRINCIPAL (Lógica de Interfaz y Reportes - Refactorizada a Dashboard)
 public class programa extends JFrame {
     private JTextField txtDato1, txtDato2;
     private JComboBox<String> cmbTipoEntrada;
@@ -87,21 +100,21 @@ public class programa extends JFrame {
         lblMenu.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // Estilización y creación de los botones del menú (Flat Design)
-        // JButton btnHistorial = crearBotonMenu("Historial Ingresos", new Color(52, 58,
-        // 64)); // Gris oscuro
         JButton btnSumar = crearBotonMenu("Sumar Vectores", new Color(23, 162, 184)); // Cyan/Celeste
         JButton btnPunto = crearBotonMenu("Producto Escalar", new Color(111, 66, 193)); // Morado
         JButton btnReporte = crearBotonMenu("Reporte Ejecutivo", new Color(52, 58, 64)); // Gris oscuro
+        JButton btnGuardar = crearBotonMenu("Guardar PDF", new Color(40, 167, 69)); // Verde para destacar la acción de
+                                                                                    // guardar
 
         panelMenu.add(lblMenu);
         panelMenu.add(Box.createRigidArea(new Dimension(0, 30))); // Espaciador
-        // panelMenu.add(btnHistorial);
-        // panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
         panelMenu.add(btnSumar);
         panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
         panelMenu.add(btnPunto);
         panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
         panelMenu.add(btnReporte);
+        panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
+        panelMenu.add(btnGuardar);
 
         add(panelMenu, BorderLayout.WEST);
 
@@ -138,9 +151,7 @@ public class programa extends JFrame {
         btnSumar.addActionListener(e -> realizarSuma());
         btnPunto.addActionListener(e -> calcularProductoEscalar());
         btnReporte.addActionListener(e -> mostrarReporteDinamico());
-
-        // Historial Ingresos puede simplemente abrir el panel inferior
-        // btnHistorial.addActionListener(e -> mostrarReporteDinamico());
+        btnGuardar.addActionListener(e -> guardarPdf());
 
         btnLimpiar.addActionListener(e -> {
             listaVectores.clear();
@@ -173,7 +184,7 @@ public class programa extends JFrame {
     }
 
     // =========================================================
-    // MÉTODOS ORIGINALES (NO MODIFICADOS)
+    // MÉTODOS ORIGINALES
     // =========================================================
 
     private void procesarDatos() {
@@ -240,25 +251,21 @@ public class programa extends JFrame {
             } else { // POLARES (M, A)
                 double magnitudIngresada = d1;
                 double anguloIngresado = d2;
-                String explicacionMagnitudNegativa = "";
 
+                // NUEVA VALIDACIÓN: Bloquear magnitud negativa
                 if (magnitudIngresada < 0) {
-                    r = Math.abs(magnitudIngresada);
-                    ang = anguloIngresado + 180;
-
-                    explicacionMagnitudNegativa = String.format(
-                            "Paso 0: Corrección de Magnitud Negativa\n" +
-                                    "Físicamente una magnitud (distancia) no puede ser negativa. El signo negativo \n" +
-                                    "indica que el vector apunta en la dirección exactamente opuesta. Por lo tanto, \n"
-                                    +
-                                    "la magnitud se vuelve positiva y se le suman 180° al ángulo.\n" +
-                                    "* Nueva Magnitud (M) = %.2f\n" +
-                                    "* Nuevo Ángulo (A) = %.2f° + 180° = %.2f°\n\n",
-                            r, anguloIngresado, ang);
-                } else {
-                    r = magnitudIngresada;
-                    ang = anguloIngresado;
+                    JOptionPane.showMessageDialog(this,
+                            "No se puede ingresar una magnitud negativa.\n\n" +
+                                    "Físicamente, la magnitud representa la longitud o distancia del vector, " +
+                                    "por lo que siempre debe ser un valor absoluto (positivo o cero).",
+                            "Error de Ingreso",
+                            JOptionPane.ERROR_MESSAGE);
+                    return; // Detiene la ejecución aquí mismo
                 }
+
+                // Si pasa la validación, se asignan los valores directamente
+                r = magnitudIngresada;
+                ang = anguloIngresado;
 
                 double radOriginal = Math.toRadians(ang);
                 x = r * Math.cos(radOriginal);
@@ -292,21 +299,21 @@ public class programa extends JFrame {
                             ang);
                 }
 
+                // REPORTE LIMPIO: Ya no incluye la variable "explicacionMagnitudNegativa"
                 procedimiento = String.format(
                         "--- VECTOR V%d (Conversión: Polares a Rectangulares) ---\n\n" +
                                 "Datos ingresados por el usuario:\n" +
                                 "* Magnitud ingresada (M) = %.2f\n" +
                                 "* Ángulo ingresado (A) = %.2f°\n\n" +
-                                "%s" +
                                 "Paso 1: Cálculo de la Coordenada Horizontal (X)\n" +
-                                "Se determina multiplicando la magnitud corregida por el coseno del ángulo.\n" +
+                                "Se determina multiplicando la magnitud por el coseno del ángulo.\n" +
                                 "* Operación: X = %.2f * cos(%.2f°) = %.4f\n\n" +
                                 "Paso 2: Cálculo de la Coordenada Vertical (Y)\n" +
-                                "Se determina multiplicando la magnitud corregida por el seno del ángulo.\n" +
+                                "Se determina multiplicando la magnitud por el seno del ángulo.\n" +
                                 "* Operación: Y = %.2f * sin(%.2f°) = %.4f\n\n" +
                                 "%s" +
                                 "---------------------------------------------------\n\n",
-                        n, magnitudIngresada, anguloIngresado, explicacionMagnitudNegativa,
+                        n, magnitudIngresada, anguloIngresado,
                         r, ang, x, r, ang, y, textoPaso3);
 
                 listaVectores.add(new VectorMulti(d1, d2, x, y, r, angNorm, "P"));
@@ -352,9 +359,36 @@ public class programa extends JFrame {
         }
 
         double resR = Math.sqrt((sumX * sumX) + (sumY * sumY));
+
+        // 1. Ángulo de calculadora base (Tangente inversa pura)
+        double anguloBruto;
+        if (sumX == 0) {
+            anguloBruto = (sumY > 0) ? 90 : (sumY < 0 ? -90 : 0);
+        } else {
+            anguloBruto = Math.toDegrees(Math.atan(sumY / sumX));
+        }
+
+        // 2. Ángulo real (0 a 360) usando atan2
         double resAng = Math.toDegrees(Math.atan2(sumY, sumX));
-        if (resAng < 0)
+        if (resAng < 0) {
             resAng += 360;
+        }
+
+        // 3. Explicación de ajuste según el cuadrante
+        String explicacionCuadrante = "";
+        if (sumX > 0 && sumY >= 0) {
+            explicacionCuadrante = "La resultante se ubica en el Cuadrante I. El ángulo real es equivalente al ángulo de referencia.";
+        } else if (sumX < 0) {
+            explicacionCuadrante = "La resultante se ubica en el Cuadrante II o III (ΣX es negativa). Se suman 180° al ángulo obtenido.\n"
+                    +
+                    "* Operación: 180° + (" + String.format("%.2f°", anguloBruto) + ")";
+        } else if (sumX > 0 && sumY < 0) {
+            explicacionCuadrante = "La resultante se ubica en el Cuadrante IV (ΣX positiva, ΣY negativa). Se suman 360° al ángulo obtenido.\n"
+                    +
+                    "* Operación: 360° + (" + String.format("%.2f°", anguloBruto) + ")";
+        } else {
+            explicacionCuadrante = "La resultante se encuentra posicionada directamente sobre uno de los ejes coordenados.";
+        }
 
         StringBuilder analisisAngulos = new StringBuilder();
         analisisAngulos.append("\n--- ANÁLISIS DE ÁNGULOS CON LA RESULTANTE ---\n");
@@ -369,11 +403,11 @@ public class programa extends JFrame {
             double anguloSep = Math.toDegrees(Math.acos(num / denom));
 
             analisisAngulos.append(String.format("Ángulo entre V%d y la Resultante (R):\n", i + 1));
-            analisisAngulos.append("Paso A: El Numerador (Producto Punto V·R)\n");
+            analisisAngulos.append("Paso A: El Numerador (V·R)\n");
             analisisAngulos.append(String.format("* Operación: (%.2f * %.2f) + (%.2f * %.2f)\n", v.x, sumX, v.y, sumY));
             analisisAngulos.append(String.format("* Resultado Numerador = %.4f\n\n", num));
 
-            analisisAngulos.append("Paso B: El Denominador (Producto de Magnitudes |V|·|R|)\n");
+            analisisAngulos.append("Paso B: El Denominador (|V|·|R|)\n");
             analisisAngulos
                     .append(String.format("* Magnitud V%d = √((%.2f)² + (%.2f)²) = %.2f\n", i + 1, v.x, v.y, magV));
             analisisAngulos.append(String.format("* Magnitud R = √((%.2f)² + (%.2f)²) = %.2f\n", sumX, sumY, magR));
@@ -400,11 +434,20 @@ public class programa extends JFrame {
                         "* Total Y (Resultante) = %.4f\n\n" +
                         "Paso 3: Formación del Vector Resultante\n" +
                         "Se calcula la nueva magnitud por Pitágoras y el ángulo aplicando Tangente Inversa.\n" +
-                        "* Magnitud (M) = √((%.2f)² + (%.2f)²) = %.4f\n" +
-                        "* Dirección (A) = tan⁻¹(ΣY / ΣX) = tan⁻¹(%.2f / %.2f) = %.2f°\n%s" +
+                        "* Magnitud (M) = √((%.2f)² + (%.2f)²) = %.4f\n\n" +
+                        "Cálculo del Ángulo de Referencia:\n" +
+                        "* Operación base = tan⁻¹(ΣY / ΣX) = tan⁻¹(%.2f / %.2f)\n" +
+                        "* Ángulo de referencia obtenido = %.2f°\n\n" +
+                        "Determinación del Ángulo en Posición Estándar:\n" +
+                        "%s\n" +
+                        "* Ángulo resultante final (0° a 360°): %.2f°\n%s" +
                         "---------------------------------------------------\n\n",
-                ecuacionX.toString(), sumX, ecuacionY.toString(), sumY, sumX, sumY, resR, sumY, sumX, resAng,
+                ecuacionX.toString(), sumX, ecuacionY.toString(), sumY,
+                sumX, sumY, resR,
+                sumY, sumX, anguloBruto,
+                explicacionCuadrante, resAng,
                 analisisAngulos.toString());
+        // --- HASTA AQUÍ ---
 
         // Actualizar Bandera y Almacenar
         reporteSuma.setLength(0); // Limpia cálculos previos
@@ -452,12 +495,12 @@ public class programa extends JFrame {
         String texto = String.format(
                 "--- PRODUCTO ESCALAR Y ÁNGULO ENTRE VECTORES ---\n\n" +
                         "Aplicando la fórmula: A = cos⁻¹((u·v) / (||u||·||v||))\n\n" +
-                        "Paso 1: El Numerador (Producto Punto u·v)\n" +
+                        "Paso 1: El Numerador (u·v)\n" +
                         "Se multiplican las componentes de cada eje y se suman.\n" +
                         "* Eje X: (%.2f) * (%.2f) = %.4f\n" +
                         "* Eje Y: (%.2f) * (%.2f) = %.4f\n" +
                         "* Suma (Numerador) = %.4f + %.4f = %.4f\n\n" +
-                        "Paso 2: El Denominador (Producto de Magnitudes ||u||·||v||)\n" +
+                        "Paso 2: El Denominador (||u||·||v||)\n" +
                         "Se calcula la longitud de cada vector por Pitágoras y se multiplican.\n" +
                         "* ||u|| = √((%.2f)² + (%.2f)²) = %.2f\n" +
                         "* ||v|| = √((%.2f)² + (%.2f)²) = %.2f\n" +
@@ -481,9 +524,6 @@ public class programa extends JFrame {
                 "Operación Exitosa", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // =========================================================
-    // MODIFICADO: Ahora carga el texto en el JTextArea central
-    // =========================================================
     private void mostrarReporteDinamico() {
         StringBuilder reporteFinal = new StringBuilder();
 
@@ -507,6 +547,90 @@ public class programa extends JFrame {
         // Animación sencilla para levantar el divisor (ocupa el 60% de la pantalla para
         // gráfica, 40% reporte)
         splitPane.setDividerLocation(0.6);
+    }
+
+    // =========================================================
+    // EXPORTACIÓN DE RESULTADOS A PDF
+    // =========================================================
+    private void guardarPdf() {
+        // 1. Validación preventiva
+        if (areaReporte.getText().trim().isEmpty() || listaVectores.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "No hay datos para exportar. Por favor, agregue vectores y genere un reporte primero.",
+                    "Área vacía",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // 2. Selección de ruta mediante JFileChooser
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Guardar Reporte como PDF");
+        fileChooser.setFileFilter(new FileNameExtensionFilter("Archivos PDF (*.pdf)", "pdf"));
+
+        int userSelection = fileChooser.showSaveDialog(this);
+        if (userSelection != JFileChooser.APPROVE_OPTION) {
+            return; // El usuario canceló
+        }
+
+        File fileToSave = fileChooser.getSelectedFile();
+        String filePath = fileToSave.getAbsolutePath();
+        if (!filePath.toLowerCase().endsWith(".pdf")) {
+            filePath += ".pdf";
+        }
+
+        try {
+            // 3. Capturar el panel gráfico (LienzoMulti) como una imagen
+            int width = panelGrafico.getWidth();
+            int height = panelGrafico.getHeight();
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g2d = image.createGraphics();
+            panelGrafico.paint(g2d);
+            g2d.dispose();
+
+            // Convertir el BufferedImage a un formato que OpenPDF entienda
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(image, "png", baos);
+            Image pdfImage = Image.getInstance(baos.toByteArray());
+
+            // Escalar la imagen para que quepa bien en el PDF sin deformarse
+            pdfImage.scaleToFit(500, 400);
+            pdfImage.setAlignment(Element.ALIGN_CENTER);
+
+            // 4. Crear el Documento PDF
+            Document document = new Document();
+            PdfWriter.getInstance(document, new FileOutputStream(filePath));
+            document.open();
+
+            // a) Título elegante
+            Paragraph titulo = new Paragraph("Reporte Ejecutivo - Analizador de Vectores\n\n",
+                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18));
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            document.add(titulo);
+
+            // b) Imagen de la gráfica
+            document.add(pdfImage);
+            document.add(new Paragraph("\n\n")); // Espaciador
+
+            // c) Texto del reporte (usando fuente monoespaciada para mantener el formato)
+            Paragraph textoReporte = new Paragraph(areaReporte.getText(),
+                    FontFactory.getFont(FontFactory.COURIER, 11));
+            document.add(textoReporte);
+
+            document.close();
+
+            // 5. Mensaje de éxito
+            JOptionPane.showMessageDialog(this,
+                    "El reporte ha sido exportado exitosamente a:\n" + filePath,
+                    "Guardado Exitoso",
+                    JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Ocurrió un error al intentar generar el PDF:\n" + ex.getMessage(),
+                    "Error de Exportación",
+                    JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {

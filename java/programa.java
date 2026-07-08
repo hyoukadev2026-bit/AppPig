@@ -35,6 +35,14 @@ public class programa extends JFrame {
 
     private boolean flagSuma = false;
     private boolean flagProducto = false;
+    // Nuevas variables para almacenar los últimos resultados del producto escalar
+    private double lastDotProductResult = 0;
+    private double lastDotProductAngle = 0;
+    // Nuevas variables para almacenar los ángulos individuales respecto a la
+    // resultante
+    // Lista dinámica para guardar los ángulos de cada vector respecto a la
+    // resultante
+    private ArrayList<Double> listaAngulosConResultante = new ArrayList<>();
 
     public programa() {
         listaVectores = new ArrayList<>();
@@ -60,6 +68,10 @@ public class programa extends JFrame {
         cmbTipoEntrada = new JComboBox<>(new String[] { "Rectangulares (X, Y)", "Polares (M, A)" });
         txtDato1 = new JTextField(7);
         txtDato2 = new JTextField(7);
+        // Activamos el resaltado de enfoque para la navegación por TAB
+        programarResaltadoEnfoque(txtDato1);
+        programarResaltadoEnfoque(txtDato2);
+        programarResaltadoEnfoque(cmbTipoEntrada);
 
         JButton btnAgregar = new JButton("Agregar Vector");
         btnAgregar.setBackground(new Color(40, 167, 69)); // Verde #28a745
@@ -150,7 +162,8 @@ public class programa extends JFrame {
         btnAgregar.addActionListener(e -> procesarDatos());
         btnSumar.addActionListener(e -> realizarSuma());
         btnPunto.addActionListener(e -> calcularProductoEscalar());
-        btnReporte.addActionListener(e -> mostrarReporteDinamico());
+        btnReporte.addActionListener(e -> mostrarReporteDinamico("TOP"));
+        // btnReporte.addActionListener(e -> mostrarReporteDinamico());
         btnGuardar.addActionListener(e -> guardarPdf());
 
         btnLimpiar.addActionListener(e -> {
@@ -449,13 +462,33 @@ public class programa extends JFrame {
                 analisisAngulos.toString());
         // --- HASTA AQUÍ ---
 
-        // Actualizar Bandera y Almacenar
-        reporteSuma.setLength(0); // Limpia cálculos previos
+        // === CAPTURA DINÁMICA DE ÁNGULOS CON LA RESULTANTE ===
+        listaAngulosConResultante.clear(); // Limpiamos cálculos anteriores
+
+        // Recorremos todos los vectores ingresados hasta el momento
+        for (VectorMulti v : listaVectores) {
+            // Calculamos la diferencia angular absoluta entre la resultante (resAng) y el
+            // vector actual
+            double diffAngulo = Math.abs(resAng - v.angulo);
+
+            // Ajuste geométrico para obtener el menor ángulo de separación (máximo 180°)
+            if (diffAngulo > 180) {
+                diffAngulo = 360 - diffAngulo;
+            }
+
+            // Guardamos el ángulo calculado en nuestra lista dinámica
+            listaAngulosConResultante.add(diffAngulo);
+        }
+
+        reporteSuma.setLength(0);
         reporteSuma.append(texto);
         flagSuma = true;
 
+        // Se agrega la resultante a la lista
         listaVectores.add(new VectorMulti(resR, resAng, sumX, sumY, resR, resAng, "S"));
         panelGrafico.repaint();
+
+        mostrarReporteDinamico("SUMA");
     }
 
     private void calcularProductoEscalar() {
@@ -514,62 +547,151 @@ public class programa extends JFrame {
                 v1.x, v1.y, magU, v2.x, v2.y, magV, magU, magV, denom,
                 productoPunto, denom, anguloSep, interpretacion);
 
-        // Actualizar Bandera y Almacenar
+        // Guardamos los resultados numéricos en las variables globales para el PDF
+        // simplificado
+        lastDotProductResult = productoPunto;
+        lastDotProductAngle = anguloSep;
+
         reporteProducto.setLength(0);
         reporteProducto.append(texto);
         flagProducto = true;
 
-        JOptionPane.showMessageDialog(this,
-                "Producto escalar calculado.\nPor favor, haga clic en 'Reporte Ejecutivo' para ver los detalles.",
-                "Operación Exitosa", JOptionPane.INFORMATION_MESSAGE);
+        // Se actualiza el reporte y viaja directamente a la sección del producto
+        // escalar
+        mostrarReporteDinamico("PRODUCTO");
     }
 
-    private void mostrarReporteDinamico() {
+    private void mostrarReporteDinamico(String focusTarget) {
         StringBuilder reporteFinal = new StringBuilder();
 
-        // 1. Siempre muestra ingresos
+        // 1. Siempre agregamos el historial de ingresos al inicio
         reporteFinal.append(reporteIngresos.toString());
 
-        // 2. Anexa Suma si fue calculada
+        int focusIndex = 0;
+
+        // 2. Si hay suma, la acoplamos
         if (flagSuma) {
+            if (focusTarget.equals("SUMA")) {
+                focusIndex = reporteFinal.length(); // Guarda la posición exacta donde inicia la suma
+            }
             reporteFinal.append(reporteSuma.toString());
         }
 
-        // 3. Anexa Producto si fue calculado
+        // 3. Si hay producto escalar, lo acoplamos
         if (flagProducto) {
+            if (focusTarget.equals("PRODUCTO")) {
+                focusIndex = reporteFinal.length(); // Guarda la posición exacta donde inicia el producto
+            }
             reporteFinal.append(reporteProducto.toString());
         }
 
-        // Cargar texto en el área inferior del Dashboard
+        // Actualizamos el JTextArea con todo el texto acumulado
         areaReporte.setText(reporteFinal.toString());
-        areaReporte.setCaretPosition(0);
 
-        // Animación sencilla para levantar el divisor (ocupa el 60% de la pantalla para
-        // gráfica, 40% reporte)
-        splitPane.setDividerLocation(0.6);
+        // Aseguramos que el panel se abra lo suficiente para leer el texto
+        splitPane.setDividerLocation(0.55);
+
+        // Movemos automáticamente la barra de desplazamiento (Scroll) hacia el cálculo
+        // indexado
+        if (focusIndex > 0) {
+            areaReporte.setCaretPosition(focusIndex);
+            areaReporte.requestFocus();
+        } else {
+            areaReporte.setCaretPosition(0);
+        }
+    }
+    // private void mostrarReporteDinamico() {
+    // StringBuilder reporteFinal = new StringBuilder();
+
+    // 1. Siempre muestra ingresos
+    // reporteFinal.append(reporteIngresos.toString());
+
+    // 2. Anexa Suma si fue calculada
+    // if (flagSuma) {
+    // reporteFinal.append(reporteSuma.toString());
+    // }
+
+    // 3. Anexa Producto si fue calculado
+    // if (flagProducto) {
+    // reporteFinal.append(reporteProducto.toString());
+    // }
+
+    // Cargar texto en el área inferior del Dashboard
+    // areaReporte.setText(reporteFinal.toString());
+    // areaReporte.setCaretPosition(0);
+
+    // Animación sencilla para levantar el divisor (ocupa el 60% de la pantalla para
+    // gráfica, 40% reporte)
+    // splitPane.setDividerLocation(0.6);
+    // }
+    // Método para generar solo el resumen de respuestas finales
+    // Método corregido para generar el resumen con las resultantes y ángulos
+    // específicos
+    // Método final optimizado para el reporte de respuestas
+    private String generateShortReport() {
+        StringBuilder shortReport = new StringBuilder();
+        shortReport.append("=========================================\n");
+        shortReport.append("       REPORTE SIMPLIFICADO DE RESULTADOS\n");
+        shortReport.append("=========================================\n\n");
+
+        shortReport.append("--- VECTORES REGISTRADOS ---\n");
+        int vectorCount = 1;
+        for (VectorMulti v : listaVectores) {
+            if (v.tipoOriginal.equals("R") || v.tipoOriginal.equals("P")) {
+                shortReport.append(String.format(
+                        "V%d -> Componentes: (X: %.2f, Y: %.2f) | Magnitud (M): %.2f | Ángulo (A): %.2f°\n",
+                        vectorCount, v.x, v.y, v.r, v.angulo));
+                vectorCount++;
+            }
+        }
+
+        // 1. Mostrar la resultante de la suma y la relación de todos los ángulos
+        if (flagSuma) {
+            shortReport.append("\n--- CÁLCULO DE VECTOR RESULTANTE (SUMA) ---\n");
+            for (VectorMulti v : listaVectores) {
+                if (v.tipoOriginal.equals("S")) {
+                    shortReport.append(String.format(
+                            "VECTOR RESULTANTE (VR) -> Componentes: (X: %.2f, Y: %.2f) | Módulo: %.2f | Ángulo: %.2f°\n",
+                            v.x, v.y, v.r, v.angulo));
+                }
+            }
+
+            shortReport.append("\n--- ÁNGULOS RESPECTO A LA RESULTANTE (VR) ---\n");
+            // Imprimimos dinámicamente el ángulo de cada vector guardado respecto a VR
+            for (int i = 0; i < listaAngulosConResultante.size(); i++) {
+                shortReport.append(String.format("Ángulo interno entre V%d y la Resultante (VR) = %.2f°\n",
+                        (i + 1), listaAngulosConResultante.get(i)));
+            }
+        }
+
+        // 2. Mostrar el Producto Escalar
+        if (flagProducto) {
+            shortReport.append("\n--- CÁLCULO DE PRODUCTO ESCALAR --- \n");
+            shortReport.append(String.format("Valor del Producto Punto = %.4f\n", lastDotProductResult));
+            shortReport.append(String.format("Ángulo de Separación entre V1 y V2 = %.2f°\n", lastDotProductAngle));
+        }
+
+        shortReport.append("\n=========================================");
+        return shortReport.toString();
     }
 
     // =========================================================
     // EXPORTACIÓN DE RESULTADOS A PDF
     // =========================================================
     private void guardarPdf() {
-        // 1. Validación preventiva
         if (areaReporte.getText().trim().isEmpty() || listaVectores.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "No hay datos para exportar. Por favor, agregue vectores y genere un reporte primero.",
-                    "Área vacía",
+            JOptionPane.showMessageDialog(this, "No hay datos para exportar.", "Área Vacía",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        // 2. Selección de ruta mediante JFileChooser
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Guardar Reporte como PDF");
         fileChooser.setFileFilter(new FileNameExtensionFilter("Archivos PDF (*.pdf)", "pdf"));
 
         int userSelection = fileChooser.showSaveDialog(this);
         if (userSelection != JFileChooser.APPROVE_OPTION) {
-            return; // El usuario canceló
+            return;
         }
 
         File fileToSave = fileChooser.getSelectedFile();
@@ -578,8 +700,27 @@ public class programa extends JFrame {
             filePath += ".pdf";
         }
 
+        // --- VENTANA DE SELECCIÓN DE DISEÑO DE PDF ---
+        Object[] opcionesMenu = { "Procedimiento Completo", "Solo Resultados" };
+        int seleccionUsuario = JOptionPane.showOptionDialog(this,
+                "¿Cómo deseas guardar el texto del reporte en el PDF?",
+                "Opciones de Exportación PDF",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                opcionesMenu,
+                opcionesMenu[0]);
+
+        // Decidimos qué texto inyectar en el documento PDF
+        String contenidoTextoPdf;
+        if (seleccionUsuario == 1) {
+            contenidoTextoPdf = generateShortReport(); // Carga solo las respuestas limpias
+        } else {
+            contenidoTextoPdf = areaReporte.getText(); // Carga todo el texto detallado del JTextArea
+        }
+
         try {
-            // 3. Capturar el panel gráfico (LienzoMulti) como una imagen
+            // Captura de imagen idéntica a tu código original
             int width = panelGrafico.getWidth();
             int height = panelGrafico.getHeight();
             BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -587,50 +728,66 @@ public class programa extends JFrame {
             panelGrafico.paint(g2d);
             g2d.dispose();
 
-            // Convertir el BufferedImage a un formato que OpenPDF entienda
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(image, "png", baos);
             Image pdfImage = Image.getInstance(baos.toByteArray());
-
-            // Escalar la imagen para que quepa bien en el PDF sin deformarse
             pdfImage.scaleToFit(500, 400);
             pdfImage.setAlignment(Element.ALIGN_CENTER);
 
-            // 4. Crear el Documento PDF
             Document document = new Document();
             PdfWriter.getInstance(document, new FileOutputStream(filePath));
             document.open();
 
-            // a) Título elegante
-            Paragraph titulo = new Paragraph("Reporte Ejecutivo - Analizador de Vectores\n\n",
+            Paragraph titulo = new Paragraph("Analizador de Vectores - Reporte Ejecutivo\n\n",
                     FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18));
             titulo.setAlignment(Element.ALIGN_CENTER);
             document.add(titulo);
 
-            // b) Imagen de la gráfica
             document.add(pdfImage);
-            document.add(new Paragraph("\n\n")); // Espaciador
+            document.add(new Paragraph("\n\n"));
 
-            // c) Texto del reporte (usando fuente monoespaciada para mantener el formato)
-            Paragraph textoReporte = new Paragraph(areaReporte.getText(),
+            // Imprimimos el texto seleccionado por el usuario (Completo o Simplificado)
+            Paragraph textoReporte = new Paragraph(contenidoTextoPdf,
                     FontFactory.getFont(FontFactory.COURIER, 11));
             document.add(textoReporte);
 
             document.close();
 
-            // 5. Mensaje de éxito
-            JOptionPane.showMessageDialog(this,
-                    "El reporte ha sido exportado exitosamente a:\n" + filePath,
-                    "Guardado Exitoso",
+            JOptionPane.showMessageDialog(this, "El PDF se guardó exitosamente en:\n" + filePath, "Guardado Exitoso",
                     JOptionPane.INFORMATION_MESSAGE);
 
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                    "Ocurrió un error al intentar generar el PDF:\n" + ex.getMessage(),
-                    "Error de Exportación",
+            JOptionPane.showMessageDialog(this, "Error al generar el PDF:\n" + ex.getMessage(), "Error",
                     JOptionPane.ERROR_MESSAGE);
             ex.printStackTrace();
         }
+    }
+
+    // Método para resaltar visualmente cualquier componente cuando gana el foco
+    // (con TAB o clic)
+    private void programarResaltadoEnfoque(JComponent componente) {
+        // Guardamos el borde original que tiene el componente por defecto
+        javax.swing.border.Border bordeOriginal = componente.getBorder();
+
+        // Creamos un nuevo borde de color azul suave con un grosor de 2 píxeles
+        // (No es exagerado, resalta la silueta exterior sin tapar el texto)
+        Color colorEnfoque = new Color(0, 120, 215);
+        javax.swing.border.Border bordeConEnfoque = BorderFactory.createLineBorder(colorEnfoque, 2);
+
+        // Agregamos el escuchador al componente
+        componente.addFocusListener(new java.awt.event.FocusListener() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                // Cuando el usuario llega con TAB, cambiamos el borde al resaltado
+                componente.setBorder(bordeConEnfoque);
+            }
+
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                // Cuando el usuario se va a otro componente, regresa a la normalidad
+                componente.setBorder(bordeOriginal);
+            }
+        });
     }
 
     public static void main(String[] args) {

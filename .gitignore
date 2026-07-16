@@ -4,4 +4,5 @@
 # Ignorar carpetas de configuración de editores (opcional pero recomendado)
 .vscode/
 .idea/
-*.iml
+*.iml# Ignorar ejecutables generados en la carpeta output
+java/output/*.exe

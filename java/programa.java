@@ -1,6 +1,12 @@
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicComboBoxUI;
+import javax.swing.plaf.basic.BasicScrollBarUI;
+
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 
 // Imports para exportación a PDF (Requiere la librería OpenPDF o iText)
@@ -17,32 +23,54 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 
-// 3. CLASE PRINCIPAL (Lógica de Interfaz y Reportes - Refactorizada a Dashboard)
 public class programa extends JFrame {
+    
+    // =========================================================
+    // VARIABLES ORIGINALES DE LÓGICA (INTACTAS)
+    // =========================================================
     private JTextField txtDato1, txtDato2;
     private JComboBox<String> cmbTipoEntrada;
     private LienzoMulti panelGrafico;
     private ArrayList<VectorMulti> listaVectores;
 
-    // Componentes del nuevo layout Dashboard
     private JSplitPane splitPane;
     private JTextArea areaReporte;
 
-    // Banderas y Constructores Modulares del Reporte
     private StringBuilder reporteIngresos;
     private StringBuilder reporteSuma;
     private StringBuilder reporteProducto;
 
     private boolean flagSuma = false;
     private boolean flagProducto = false;
-    // Nuevas variables para almacenar los últimos resultados del producto escalar
     private double lastDotProductResult = 0;
     private double lastDotProductAngle = 0;
-    // Nuevas variables para almacenar los ángulos individuales respecto a la
-    // resultante
-    // Lista dinámica para guardar los ángulos de cada vector respecto a la
-    // resultante
     private ArrayList<Double> listaAngulosConResultante = new ArrayList<>();
+
+    // =========================================================
+    // VARIABLES DE UI/UX MODERNAS
+    // =========================================================
+    private JPanel panelMenuWrapper;
+    private CardPanel panelReporteCard;
+    
+    // Banderas de estado visual
+    private boolean menuOpen = true;
+    private boolean reportOpen = false;
+
+    // Paleta de colores moderna
+    public static final Color BG_COLOR = new Color(245, 247, 250);
+    public static final Color CARD_COLOR = new Color(255, 255, 255);
+    public static final Color BORDER_COLOR = new Color(230, 232, 236);
+    public static final Color TEXT_COLOR = new Color(30, 41, 59);
+    
+    public static final Color ACCENT_BLUE = new Color(59, 130, 246);
+    public static final Color ACCENT_GREEN = new Color(34, 197, 94);
+    public static final Color ACCENT_PURPLE = new Color(139, 92, 246);
+    public static final Color ACCENT_RED = new Color(239, 68, 68);
+    public static final Color ACCENT_CYAN = new Color(6, 182, 212);
+    public static final Color ACCENT_DARK = new Color(51, 65, 85);
+
+    public static final Font MAIN_FONT = new Font("Segoe UI", Font.PLAIN, 14);
+    public static final Font BOLD_FONT = new Font("Segoe UI", Font.BOLD, 14);
 
     public programa() {
         listaVectores = new ArrayList<>();
@@ -50,120 +78,152 @@ public class programa extends JFrame {
         reporteSuma = new StringBuilder();
         reporteProducto = new StringBuilder();
 
-        setTitle("Analizador de Vectores");
-        setSize(1200, 750); // Ligeramente más ancho para acomodar el menú lateral
+        setTitle("Analizador de Vectores 2026");
+        setSize(1280, 800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        getContentPane().setBackground(BG_COLOR);
 
-        // 1. ARQUITECTURA PRINCIPAL: BorderLayout
-        setLayout(new BorderLayout());
+        JPanel mainWrapper = new JPanel(new BorderLayout(15, 15));
+        mainWrapper.setBackground(BG_COLOR);
+        mainWrapper.setBorder(new EmptyBorder(15, 15, 15, 15));
+        setContentPane(mainWrapper);
 
         // =========================================================
-        // 2. PANEL SUPERIOR (NORTH) - Ingreso de Datos
+        // 1. PANEL SUPERIOR (NORTH)
         // =========================================================
-        JPanel panelNorte = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 15));
-        panelNorte.setBackground(new Color(245, 246, 248));
-        panelNorte.setBorder(new EmptyBorder(5, 10, 5, 10));
+        CardPanel panelNorte = new CardPanel();
+        panelNorte.setLayout(new FlowLayout(FlowLayout.LEFT, 20, 15));
 
-        cmbTipoEntrada = new JComboBox<>(new String[] { "Rectangulares (X, Y)", "Polares (M, A)" });
-        txtDato1 = new JTextField(7);
-        txtDato2 = new JTextField(7);
-        // Activamos el resaltado de enfoque para la navegación por TAB
-        programarResaltadoEnfoque(txtDato1);
-        programarResaltadoEnfoque(txtDato2);
-        programarResaltadoEnfoque(cmbTipoEntrada);
+        cmbTipoEntrada = new ModernComboBox(new String[] { "Rectangulares (X, Y)", "Polares (M, A)" });
+        txtDato1 = new ModernTextField(8);
+        txtDato2 = new ModernTextField(8);
+        
+        ModernButton btnAgregar = new ModernButton("Agregar Vector", ACCENT_GREEN);
+        ModernButton btnLimpiar = new ModernButton("Limpiar Lienzo", ACCENT_RED);
+        btnLimpiar.setOutlined(true);
 
-        JButton btnAgregar = new JButton("Agregar Vector");
-        btnAgregar.setBackground(new Color(40, 167, 69)); // Verde #28a745
-        btnAgregar.setForeground(Color.WHITE);
-        btnAgregar.setFocusPainted(false);
-        btnAgregar.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btnAgregar.setOpaque(true);
-        btnAgregar.setBorderPainted(false);
-        JButton btnLimpiar = new JButton("Limpiar Lienzo");
-        btnLimpiar.setBackground(Color.WHITE);
-        btnLimpiar.setForeground(new Color(220, 53, 69)); // Rojo #dc3545
-        btnLimpiar.setFocusPainted(false);
-        btnLimpiar.setFont(new Font("SansSerif", Font.BOLD, 12));
+        JLabel lblTipo = new JLabel("Tipo de Entrada:");
+        lblTipo.setFont(BOLD_FONT);
+        lblTipo.setForeground(TEXT_COLOR);
+        
+        JLabel lblD1 = new JLabel("Dato 1:");
+        lblD1.setFont(BOLD_FONT);
+        lblD1.setForeground(TEXT_COLOR);
+        
+        JLabel lblD2 = new JLabel("Dato 2:");
+        lblD2.setFont(BOLD_FONT);
+        lblD2.setForeground(TEXT_COLOR);
 
-        panelNorte.add(new JLabel("Tipo:"));
+        panelNorte.add(lblTipo);
         panelNorte.add(cmbTipoEntrada);
-        panelNorte.add(new JLabel(" D1:"));
+        panelNorte.add(lblD1);
         panelNorte.add(txtDato1);
-        panelNorte.add(new JLabel(" D2:"));
+        panelNorte.add(lblD2);
         panelNorte.add(txtDato2);
         panelNorte.add(btnAgregar);
         panelNorte.add(btnLimpiar);
 
-        add(panelNorte, BorderLayout.NORTH);
+        mainWrapper.add(panelNorte, BorderLayout.NORTH);
 
         // =========================================================
-        // 3. PANEL LATERAL IZQUIERDO (WEST) - Menú Principal
+        // 2. PANEL LATERAL (WEST) - Con botón Toggle
         // =========================================================
-        JPanel panelMenu = new JPanel();
+        JPanel menuArea = new JPanel(new BorderLayout(10, 0));
+        menuArea.setOpaque(false);
+
+        ModernButton btnToggleMenu = new ModernButton("☰", ACCENT_DARK);
+        btnToggleMenu.setPreferredSize(new Dimension(45, 45)); 
+        btnToggleMenu.setToolTipText("Mostrar/Ocultar Menú");
+        btnToggleMenu.addActionListener(e -> animarVistas(!menuOpen, reportOpen));
+
+        JPanel togglePanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        togglePanel.setOpaque(false);
+        togglePanel.add(btnToggleMenu);
+        menuArea.add(togglePanel, BorderLayout.WEST);
+
+        panelMenuWrapper = new JPanel(new BorderLayout());
+        panelMenuWrapper.setOpaque(false);
+        // Ajuste de ancho inicial a 255 para evitar recortes
+        panelMenuWrapper.setPreferredSize(new Dimension(255, 0)); 
+
+        CardPanel panelMenu = new CardPanel();
         panelMenu.setLayout(new BoxLayout(panelMenu, BoxLayout.Y_AXIS));
-        panelMenu.setPreferredSize(new Dimension(220, 0));
-        panelMenu.setBackground(new Color(33, 37, 41)); // Gris muy oscuro #212529
-        panelMenu.setBorder(new EmptyBorder(20, 10, 20, 10));
+        panelMenu.setBorder(new EmptyBorder(25, 20, 25, 20));
 
-        JLabel lblMenu = new JLabel("MENÚ PRINCIPAL");
-        lblMenu.setForeground(Color.WHITE);
-        lblMenu.setFont(new Font("SansSerif", Font.BOLD, 16));
+        JLabel lblMenu = new JLabel("MENÚ");
+        lblMenu.setForeground(TEXT_COLOR);
+        lblMenu.setFont(new Font("Segoe UI", Font.BOLD, 18));
         lblMenu.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Estilización y creación de los botones del menú (Flat Design)
-        JButton btnSumar = crearBotonMenu("Sumar Vectores", new Color(23, 162, 184)); // Cyan/Celeste
-        JButton btnPunto = crearBotonMenu("Producto Escalar", new Color(111, 66, 193)); // Morado
-        JButton btnReporte = crearBotonMenu("Reporte Ejecutivo", new Color(52, 58, 64)); // Gris oscuro
-        JButton btnGuardar = crearBotonMenu("Guardar PDF", new Color(40, 167, 69)); // Verde para destacar la acción de
-                                                                                    // guardar
+        ModernButton btnSumar = new ModernButton("Sumar Vectores", ACCENT_CYAN);
+        ModernButton btnPunto = new ModernButton("Producto Escalar", ACCENT_PURPLE);
+        ModernButton btnReporte = new ModernButton("Reporte Ejecutivo", ACCENT_DARK);
+        ModernButton btnGuardar = new ModernButton("Guardar PDF", ACCENT_GREEN);
 
         panelMenu.add(lblMenu);
-        panelMenu.add(Box.createRigidArea(new Dimension(0, 30))); // Espaciador
+        panelMenu.add(Box.createRigidArea(new Dimension(0, 30)));
         panelMenu.add(btnSumar);
-        panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
+        panelMenu.add(Box.createRigidArea(new Dimension(0, 15)));
         panelMenu.add(btnPunto);
-        panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
+        panelMenu.add(Box.createRigidArea(new Dimension(0, 15)));
         panelMenu.add(btnReporte);
-        panelMenu.add(Box.createRigidArea(new Dimension(0, 10)));
+        panelMenu.add(Box.createRigidArea(new Dimension(0, 40)));
         panelMenu.add(btnGuardar);
 
-        add(panelMenu, BorderLayout.WEST);
+        panelMenuWrapper.add(panelMenu, BorderLayout.CENTER);
+        menuArea.add(panelMenuWrapper, BorderLayout.CENTER);
+
+        mainWrapper.add(menuArea, BorderLayout.WEST);
 
         // =========================================================
-        // 4. ÁREA CENTRAL (CENTER) - JSplitPane
+        // 3. ÁREA CENTRAL (CENTER) - Gráfica y Reporte
         // =========================================================
-        panelGrafico = new LienzoMulti(listaVectores); // Lienzo superior
+        CardPanel panelGraficoCard = new CardPanel();
+        panelGraficoCard.setLayout(new BorderLayout());
+        panelGrafico = new LienzoMulti(listaVectores); 
+        panelGraficoCard.add(panelGrafico, BorderLayout.CENTER);
 
+        panelReporteCard = new CardPanel();
+        panelReporteCard.setLayout(new BorderLayout());
+        panelReporteCard.setVisible(false); 
+        
         areaReporte = new JTextArea();
         areaReporte.setEditable(false);
-        areaReporte.setFont(new Font("Monospaced", Font.PLAIN, 13));
+        areaReporte.setFont(new Font("Consolas", Font.PLAIN, 14));
         areaReporte.setLineWrap(true);
         areaReporte.setWrapStyleWord(true);
-        areaReporte.setBackground(new Color(250, 250, 250));
+        areaReporte.setBackground(CARD_COLOR);
+        areaReporte.setForeground(TEXT_COLOR);
+        areaReporte.setBorder(new EmptyBorder(15, 15, 15, 15));
 
-        JScrollPane scrollReporte = new JScrollPane(areaReporte); // Text area inferior
-        scrollReporte.setBorder(BorderFactory.createTitledBorder("Panel de Reportes"));
+        ModernScrollPane scrollReporte = new ModernScrollPane(areaReporte);
+        
+        JLabel lblTituloReporte = new JLabel("  Panel de Reportes");
+        lblTituloReporte.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblTituloReporte.setForeground(TEXT_COLOR);
+        lblTituloReporte.setBorder(new EmptyBorder(10, 5, 10, 5));
+        
+        panelReporteCard.add(lblTituloReporte, BorderLayout.NORTH);
+        panelReporteCard.add(scrollReporte, BorderLayout.CENTER);
 
-        splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, panelGrafico, scrollReporte);
+        splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panelGraficoCard, panelReporteCard);
         splitPane.setContinuousLayout(true);
-        splitPane.setOneTouchExpandable(true);
-        splitPane.setDividerSize(10);
+        splitPane.setDividerSize(0);
         splitPane.setBorder(null);
+        splitPane.setOpaque(false);
+        // Garantiza que la gráfica obtenga el espacio adicional al maximizar ventana
+        splitPane.setResizeWeight(0.68); 
 
-        add(splitPane, BorderLayout.CENTER);
-
-        // Posicionar el divisor del JSplitPane casi al fondo una vez que la UI cargue
-        SwingUtilities.invokeLater(() -> splitPane.setDividerLocation(0.95));
+        mainWrapper.add(splitPane, BorderLayout.CENTER);
 
         // =========================================================
-        // EVENTOS (Listeners)
+        // EVENTOS ORIGINALES
         // =========================================================
         btnAgregar.addActionListener(e -> procesarDatos());
         btnSumar.addActionListener(e -> realizarSuma());
         btnPunto.addActionListener(e -> calcularProductoEscalar());
         btnReporte.addActionListener(e -> mostrarReporteDinamico("TOP"));
-        // btnReporte.addActionListener(e -> mostrarReporteDinamico());
         btnGuardar.addActionListener(e -> guardarPdf());
 
         btnLimpiar.addActionListener(e -> {
@@ -176,28 +236,66 @@ public class programa extends JFrame {
             areaReporte.setText("");
             panelGrafico.repaint();
 
-            // Colapsar el panel de reportes suavemente
-            splitPane.setDividerLocation(0.95);
+            animarVistas(true, false);
         });
     }
 
-    // Método auxiliar para estilizar botones laterales flat
-    private JButton crearBotonMenu(String texto, Color fondo) {
-        JButton btn = new JButton(texto);
-        btn.setBackground(fondo);
-        btn.setForeground(Color.WHITE);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 13));
-        btn.setFocusPainted(false);
-        btn.setBorderPainted(false);
-        btn.setOpaque(true);
-        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        return btn;
+    // =========================================================
+    // MOTOR DE ANIMACIÓN UI/UX MEJORADO
+    // =========================================================
+    private void animarVistas(boolean targetMenu, boolean targetReport) {
+        if (menuOpen == targetMenu && reportOpen == targetReport) return;
+
+        if (targetReport && !reportOpen) {
+            panelReporteCard.setVisible(true);
+            splitPane.setDividerLocation(splitPane.getWidth()); 
+        }
+
+        int startMenuW = panelMenuWrapper.getWidth();
+        // Ancho máximo del menú ajustado a 255
+        int endMenuW = targetMenu ? 255 : 0; 
+
+        int widthSplitPane = splitPane.getWidth();
+        int startDiv = splitPane.getDividerLocation();
+        
+        // La gráfica ocuperá el 68% (dejando 32% para reportes) para evitar recortes en textos laterales
+        int endDiv = targetReport ? (int)(widthSplitPane * 0.68) : widthSplitPane;
+
+        long duration = 350; 
+        long startTime = System.currentTimeMillis();
+
+        Timer timer = new Timer(15, null);
+        timer.addActionListener(e -> {
+            long elapsed = System.currentTimeMillis() - startTime;
+            float progress = Math.min(1f, (float) elapsed / duration);
+            
+            float ease = 1 - (float) Math.pow(1 - progress, 3);
+
+            if (menuOpen != targetMenu) {
+                int currMenuW = (int) (startMenuW + (endMenuW - startMenuW) * ease);
+                panelMenuWrapper.setPreferredSize(new Dimension(currMenuW, 0));
+                panelMenuWrapper.revalidate();
+            }
+
+            if (reportOpen != targetReport) {
+                int currDiv = (int) (startDiv + (endDiv - startDiv) * ease);
+                splitPane.setDividerLocation(currDiv);
+            }
+
+            if (progress >= 1f) {
+                timer.stop();
+                menuOpen = targetMenu;
+                reportOpen = targetReport;
+                if (!targetReport) {
+                    panelReporteCard.setVisible(false);
+                }
+            }
+        });
+        timer.start();
     }
 
     // =========================================================
-    // MÉTODOS ORIGINALES
+    // MÉTODOS DE LÓGICA ORIGINALES (INTACTOS)
     // =========================================================
 
     private void procesarDatos() {
@@ -210,7 +308,7 @@ public class programa extends JFrame {
 
             int modoSeleccionado = cmbTipoEntrada.getSelectedIndex();
 
-            if (modoSeleccionado == 0) { // RECTANGULARES (X, Y)
+            if (modoSeleccionado == 0) { 
                 x = d1;
                 y = d2;
                 r = Math.sqrt((x * x) + (y * y));
@@ -261,11 +359,10 @@ public class programa extends JFrame {
 
                 listaVectores.add(new VectorMulti(d1, d2, x, y, r, ang, "R"));
 
-            } else { // POLARES (M, A)
+            } else { 
                 double magnitudIngresada = d1;
                 double anguloIngresado = d2;
 
-                // NUEVA VALIDACIÓN: Bloquear magnitud negativa
                 if (magnitudIngresada < 0) {
                     JOptionPane.showMessageDialog(this,
                             "No se puede ingresar una magnitud negativa.\n\n" +
@@ -273,10 +370,9 @@ public class programa extends JFrame {
                                     "por lo que siempre debe ser un valor absoluto (positivo o cero).",
                             "Error de Ingreso",
                             JOptionPane.ERROR_MESSAGE);
-                    return; // Detiene la ejecución aquí mismo
+                    return; 
                 }
 
-                // Si pasa la validación, se asignan los valores directamente
                 r = magnitudIngresada;
                 ang = anguloIngresado;
 
@@ -312,7 +408,6 @@ public class programa extends JFrame {
                             ang);
                 }
 
-                // REPORTE LIMPIO: Ya no incluye la variable "explicacionMagnitudNegativa"
                 procedimiento = String.format(
                         "--- VECTOR V%d (Conversión: Polares a Rectangulares) ---\n\n" +
                                 "Datos ingresados por el usuario:\n" +
@@ -344,7 +439,6 @@ public class programa extends JFrame {
     }
 
     private void realizarSuma() {
-        // Elimina suma anterior si la hubiese para no acumular en gráfico
         listaVectores.removeIf(v -> "S".equals(v.tipoOriginal));
 
         if (listaVectores.size() < 2) {
@@ -359,10 +453,8 @@ public class programa extends JFrame {
 
         for (int i = 0; i < listaVectores.size(); i++) {
             VectorMulti v = listaVectores.get(i);
-
             sumX += v.x;
             sumY += v.y;
-
             ecuacionX.append(String.format("(%.2f)", v.x));
             ecuacionY.append(String.format("(%.2f)", v.y));
             if (i < listaVectores.size() - 1) {
@@ -372,8 +464,6 @@ public class programa extends JFrame {
         }
 
         double resR = Math.sqrt((sumX * sumX) + (sumY * sumY));
-
-        // 1. Ángulo de calculadora base (Tangente inversa pura)
         double anguloBruto;
         if (sumX == 0) {
             anguloBruto = (sumY > 0) ? 90 : (sumY < 0 ? -90 : 0);
@@ -381,24 +471,20 @@ public class programa extends JFrame {
             anguloBruto = Math.toDegrees(Math.atan(sumY / sumX));
         }
 
-        // 2. Ángulo real (0 a 360) usando atan2
         double resAng = Math.toDegrees(Math.atan2(sumY, sumX));
         if (resAng < 0) {
             resAng += 360;
         }
 
-        // 3. Explicación de ajuste según el cuadrante
         String explicacionCuadrante = "";
         if (sumX > 0 && sumY >= 0) {
             explicacionCuadrante = "La resultante se ubica en el Cuadrante I. El ángulo real es equivalente al ángulo de referencia.";
         } else if (sumX < 0) {
             explicacionCuadrante = "La resultante se ubica en el Cuadrante II o III (ΣX es negativa). Se suman 180° al ángulo obtenido.\n"
-                    +
-                    "* Operación: 180° + (" + String.format("%.2f°", anguloBruto) + ")";
+                    + "* Operación: 180° + (" + String.format("%.2f°", anguloBruto) + ")";
         } else if (sumX > 0 && sumY < 0) {
             explicacionCuadrante = "La resultante se ubica en el Cuadrante IV (ΣX positiva, ΣY negativa). Se suman 360° al ángulo obtenido.\n"
-                    +
-                    "* Operación: 360° + (" + String.format("%.2f°", anguloBruto) + ")";
+                    + "* Operación: 360° + (" + String.format("%.2f°", anguloBruto) + ")";
         } else {
             explicacionCuadrante = "La resultante se encuentra posicionada directamente sobre uno de los ejes coordenados.";
         }
@@ -419,14 +505,10 @@ public class programa extends JFrame {
             analisisAngulos.append("Paso A: El Numerador (V·R)\n");
             analisisAngulos.append(String.format("* Operación: (%.2f * %.2f) + (%.2f * %.2f)\n", v.x, sumX, v.y, sumY));
             analisisAngulos.append(String.format("* Resultado Numerador = %.4f\n\n", num));
-
             analisisAngulos.append("Paso B: El Denominador (|V|·|R|)\n");
-            analisisAngulos
-                    .append(String.format("* Magnitud V%d = √((%.2f)² + (%.2f)²) = %.2f\n", i + 1, v.x, v.y, magV));
+            analisisAngulos.append(String.format("* Magnitud V%d = √((%.2f)² + (%.2f)²) = %.2f\n", i + 1, v.x, v.y, magV));
             analisisAngulos.append(String.format("* Magnitud R = √((%.2f)² + (%.2f)²) = %.2f\n", sumX, sumY, magR));
-            analisisAngulos
-                    .append(String.format("* Resultado Denominador = %.2f * %.2f = %.4f\n\n", magV, magR, denom));
-
+            analisisAngulos.append(String.format("* Resultado Denominador = %.2f * %.2f = %.4f\n\n", magV, magR, denom));
             analisisAngulos.append("Paso C: División y Ángulo Final\n");
             analisisAngulos.append(String.format("* cos(A) = (%.4f) / (%.4f)\n", num, denom));
             if (Double.isNaN(anguloSep)) {
@@ -460,23 +542,13 @@ public class programa extends JFrame {
                 sumY, sumX, anguloBruto,
                 explicacionCuadrante, resAng,
                 analisisAngulos.toString());
-        // --- HASTA AQUÍ ---
 
-        // === CAPTURA DINÁMICA DE ÁNGULOS CON LA RESULTANTE ===
-        listaAngulosConResultante.clear(); // Limpiamos cálculos anteriores
-
-        // Recorremos todos los vectores ingresados hasta el momento
+        listaAngulosConResultante.clear();
         for (VectorMulti v : listaVectores) {
-            // Calculamos la diferencia angular absoluta entre la resultante (resAng) y el
-            // vector actual
             double diffAngulo = Math.abs(resAng - v.angulo);
-
-            // Ajuste geométrico para obtener el menor ángulo de separación (máximo 180°)
             if (diffAngulo > 180) {
                 diffAngulo = 360 - diffAngulo;
             }
-
-            // Guardamos el ángulo calculado en nuestra lista dinámica
             listaAngulosConResultante.add(diffAngulo);
         }
 
@@ -484,7 +556,6 @@ public class programa extends JFrame {
         reporteSuma.append(texto);
         flagSuma = true;
 
-        // Se agrega la resultante a la lista
         listaVectores.add(new VectorMulti(resR, resAng, sumX, sumY, resR, resAng, "S"));
         panelGrafico.repaint();
 
@@ -528,16 +599,16 @@ public class programa extends JFrame {
         String texto = String.format(
                 "--- PRODUCTO ESCALAR Y ÁNGULO ENTRE VECTORES ---\n\n" +
                         "Aplicando la fórmula: A = cos⁻¹((u·v) / (||u||·||v||))\n\n" +
-                        "Paso 1: El Numerador (u·v)\n" +
+                        "Paso 1: Producto Escalar - El Numerador (u·v)\n" +
                         "Se multiplican las componentes de cada eje y se suman.\n" +
                         "* Eje X: (%.2f) * (%.2f) = %.4f\n" +
                         "* Eje Y: (%.2f) * (%.2f) = %.4f\n" +
-                        "* Suma (Numerador) = %.4f + %.4f = %.4f\n\n" +
-                        "Paso 2: El Denominador (||u||·||v||)\n" +
+                        "* Suma = %.4f + %.4f = %.4f\n\n" +
+                        "Paso 2: Magnitudes de los Vectores - El Denominador (||u||·||v||)\n" +
                         "Se calcula la longitud de cada vector por Pitágoras y se multiplican.\n" +
                         "* ||u|| = √((%.2f)² + (%.2f)²) = %.2f\n" +
                         "* ||v|| = √((%.2f)² + (%.2f)²) = %.2f\n" +
-                        "* Producto (Denominador) = %.2f * %.2f = %.4f\n\n" +
+                        "* Multiplica = %.2f * %.2f = %.4f\n\n" +
                         "Paso 3: División y Ángulo Final\n" +
                         "* cos(A) = (%.4f) / (%.4f)\n" +
                         "* Ángulo exacto de separación: %.2f°\n\n" +
@@ -547,8 +618,6 @@ public class programa extends JFrame {
                 v1.x, v1.y, magU, v2.x, v2.y, magV, magU, magV, denom,
                 productoPunto, denom, anguloSep, interpretacion);
 
-        // Guardamos los resultados numéricos en las variables globales para el PDF
-        // simplificado
         lastDotProductResult = productoPunto;
         lastDotProductAngle = anguloSep;
 
@@ -556,43 +625,33 @@ public class programa extends JFrame {
         reporteProducto.append(texto);
         flagProducto = true;
 
-        // Se actualiza el reporte y viaja directamente a la sección del producto
-        // escalar
         mostrarReporteDinamico("PRODUCTO");
     }
 
     private void mostrarReporteDinamico(String focusTarget) {
         StringBuilder reporteFinal = new StringBuilder();
-
-        // 1. Siempre agregamos el historial de ingresos al inicio
         reporteFinal.append(reporteIngresos.toString());
 
         int focusIndex = 0;
 
-        // 2. Si hay suma, la acoplamos
         if (flagSuma) {
             if (focusTarget.equals("SUMA")) {
-                focusIndex = reporteFinal.length(); // Guarda la posición exacta donde inicia la suma
+                focusIndex = reporteFinal.length(); 
             }
             reporteFinal.append(reporteSuma.toString());
         }
 
-        // 3. Si hay producto escalar, lo acoplamos
         if (flagProducto) {
             if (focusTarget.equals("PRODUCTO")) {
-                focusIndex = reporteFinal.length(); // Guarda la posición exacta donde inicia el producto
+                focusIndex = reporteFinal.length();
             }
             reporteFinal.append(reporteProducto.toString());
         }
 
-        // Actualizamos el JTextArea con todo el texto acumulado
         areaReporte.setText(reporteFinal.toString());
 
-        // Aseguramos que el panel se abra lo suficiente para leer el texto
-        splitPane.setDividerLocation(0.55);
+        animarVistas(false, true);
 
-        // Movemos automáticamente la barra de desplazamiento (Scroll) hacia el cálculo
-        // indexado
         if (focusIndex > 0) {
             areaReporte.setCaretPosition(focusIndex);
             areaReporte.requestFocus();
@@ -600,34 +659,7 @@ public class programa extends JFrame {
             areaReporte.setCaretPosition(0);
         }
     }
-    // private void mostrarReporteDinamico() {
-    // StringBuilder reporteFinal = new StringBuilder();
 
-    // 1. Siempre muestra ingresos
-    // reporteFinal.append(reporteIngresos.toString());
-
-    // 2. Anexa Suma si fue calculada
-    // if (flagSuma) {
-    // reporteFinal.append(reporteSuma.toString());
-    // }
-
-    // 3. Anexa Producto si fue calculado
-    // if (flagProducto) {
-    // reporteFinal.append(reporteProducto.toString());
-    // }
-
-    // Cargar texto en el área inferior del Dashboard
-    // areaReporte.setText(reporteFinal.toString());
-    // areaReporte.setCaretPosition(0);
-
-    // Animación sencilla para levantar el divisor (ocupa el 60% de la pantalla para
-    // gráfica, 40% reporte)
-    // splitPane.setDividerLocation(0.6);
-    // }
-    // Método para generar solo el resumen de respuestas finales
-    // Método corregido para generar el resumen con las resultantes y ángulos
-    // específicos
-    // Método final optimizado para el reporte de respuestas
     private String generateShortReport() {
         StringBuilder shortReport = new StringBuilder();
         shortReport.append("=========================================\n");
@@ -645,26 +677,23 @@ public class programa extends JFrame {
             }
         }
 
-        // 1. Mostrar la resultante de la suma y la relación de todos los ángulos
         if (flagSuma) {
             shortReport.append("\n--- CÁLCULO DE VECTOR RESULTANTE (SUMA) ---\n");
             for (VectorMulti v : listaVectores) {
                 if (v.tipoOriginal.equals("S")) {
                     shortReport.append(String.format(
-                            "VECTOR RESULTANTE (VR) -> Componentes: (X: %.2f, Y: %.2f) | Módulo: %.2f | Ángulo: %.2f°\n",
+                            "VECTOR RESULTANTE (VR) -> Componentes: (X: %.2f, Y: %.2f) | Magnitud: %.2f | Ángulo: %.2f°\n",
                             v.x, v.y, v.r, v.angulo));
                 }
             }
 
             shortReport.append("\n--- ÁNGULOS RESPECTO A LA RESULTANTE (VR) ---\n");
-            // Imprimimos dinámicamente el ángulo de cada vector guardado respecto a VR
             for (int i = 0; i < listaAngulosConResultante.size(); i++) {
                 shortReport.append(String.format("Ángulo interno entre V%d y la Resultante (VR) = %.2f°\n",
                         (i + 1), listaAngulosConResultante.get(i)));
             }
         }
 
-        // 2. Mostrar el Producto Escalar
         if (flagProducto) {
             shortReport.append("\n--- CÁLCULO DE PRODUCTO ESCALAR --- \n");
             shortReport.append(String.format("Valor del Producto Punto = %.4f\n", lastDotProductResult));
@@ -675,9 +704,6 @@ public class programa extends JFrame {
         return shortReport.toString();
     }
 
-    // =========================================================
-    // EXPORTACIÓN DE RESULTADOS A PDF
-    // =========================================================
     private void guardarPdf() {
         if (areaReporte.getText().trim().isEmpty() || listaVectores.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No hay datos para exportar.", "Área Vacía",
@@ -700,7 +726,6 @@ public class programa extends JFrame {
             filePath += ".pdf";
         }
 
-        // --- VENTANA DE SELECCIÓN DE DISEÑO DE PDF ---
         Object[] opcionesMenu = { "Procedimiento Completo", "Solo Resultados" };
         int seleccionUsuario = JOptionPane.showOptionDialog(this,
                 "¿Cómo deseas guardar el texto del reporte en el PDF?",
@@ -711,16 +736,14 @@ public class programa extends JFrame {
                 opcionesMenu,
                 opcionesMenu[0]);
 
-        // Decidimos qué texto inyectar en el documento PDF
         String contenidoTextoPdf;
         if (seleccionUsuario == 1) {
-            contenidoTextoPdf = generateShortReport(); // Carga solo las respuestas limpias
+            contenidoTextoPdf = generateShortReport(); 
         } else {
-            contenidoTextoPdf = areaReporte.getText(); // Carga todo el texto detallado del JTextArea
+            contenidoTextoPdf = areaReporte.getText(); 
         }
 
         try {
-            // Captura de imagen idéntica a tu código original
             int width = panelGrafico.getWidth();
             int height = panelGrafico.getHeight();
             BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -746,7 +769,6 @@ public class programa extends JFrame {
             document.add(pdfImage);
             document.add(new Paragraph("\n\n"));
 
-            // Imprimimos el texto seleccionado por el usuario (Completo o Simplificado)
             Paragraph textoReporte = new Paragraph(contenidoTextoPdf,
                     FontFactory.getFont(FontFactory.COURIER, 11));
             document.add(textoReporte);
@@ -763,40 +785,243 @@ public class programa extends JFrame {
         }
     }
 
-    // Método para resaltar visualmente cualquier componente cuando gana el foco
-    // (con TAB o clic)
-    private void programarResaltadoEnfoque(JComponent componente) {
-        // Guardamos el borde original que tiene el componente por defecto
-        javax.swing.border.Border bordeOriginal = componente.getBorder();
-
-        // Creamos un nuevo borde de color azul suave con un grosor de 2 píxeles
-        // (No es exagerado, resalta la silueta exterior sin tapar el texto)
-        Color colorEnfoque = new Color(0, 120, 215);
-        javax.swing.border.Border bordeConEnfoque = BorderFactory.createLineBorder(colorEnfoque, 2);
-
-        // Agregamos el escuchador al componente
-        componente.addFocusListener(new java.awt.event.FocusListener() {
-            @Override
-            public void focusGained(java.awt.event.FocusEvent e) {
-                // Cuando el usuario llega con TAB, cambiamos el borde al resaltado
-                componente.setBorder(bordeConEnfoque);
-            }
-
-            @Override
-            public void focusLost(java.awt.event.FocusEvent e) {
-                // Cuando el usuario se va a otro componente, regresa a la normalidad
-                componente.setBorder(bordeOriginal);
-            }
-        });
-    }
-
     public static void main(String[] args) {
-        // Establecer un look and feel más moderno si está disponible
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception ignored) {
-        }
+            UIManager.put("Button.font", MAIN_FONT);
+            UIManager.put("Label.font", MAIN_FONT);
+            UIManager.put("TextField.font", MAIN_FONT);
+            UIManager.put("ComboBox.font", MAIN_FONT);
+            UIManager.put("ToolTip.font", MAIN_FONT);
+        } catch (Exception ignored) { }
 
         SwingUtilities.invokeLater(() -> new programa().setVisible(true));
+    }
+
+    // =========================================================
+    // COMPONENTES UI/UX PERSONALIZADOS (PURE SWING)
+    // =========================================================
+
+    class CardPanel extends JPanel {
+        private int radius = 15;
+
+        public CardPanel() {
+            setOpaque(false);
+            setBackground(CARD_COLOR);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            g2.setColor(new Color(0, 0, 0, 8));
+            g2.fillRoundRect(2, 2, getWidth() - 4, getHeight() - 4, radius, radius);
+            g2.setColor(new Color(0, 0, 0, 4));
+            g2.fillRoundRect(1, 1, getWidth() - 2, getHeight() - 2, radius, radius);
+
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, getWidth() - 4, getHeight() - 4, radius, radius);
+            g2.dispose();
+            super.paintComponent(g);
+        }
+    }
+
+    class ModernButton extends JButton {
+        private Color normalColor;
+        private Color hoverColor;
+        private Color pressedColor;
+        private boolean isOutlined = false;
+        private boolean hovered = false;
+        private boolean pressed = false;
+        private int radius = 10;
+
+        public ModernButton(String text, Color baseColor) {
+            super(text);
+            this.normalColor = baseColor;
+            this.hoverColor = brighten(baseColor, 0.15f);
+            this.pressedColor = darken(baseColor, 0.1f);
+
+            setFont(BOLD_FONT);
+            setForeground(Color.WHITE);
+            setFocusPainted(false);
+            setContentAreaFilled(false);
+            setBorderPainted(false);
+            setCursor(new Cursor(Cursor.HAND_CURSOR));
+            setPreferredSize(new Dimension(180, 40));
+            setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
+
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseEntered(MouseEvent e) { hovered = true; repaint(); }
+                @Override
+                public void mouseExited(MouseEvent e) { hovered = false; pressed = false; repaint(); }
+                @Override
+                public void mousePressed(MouseEvent e) { pressed = true; repaint(); }
+                @Override
+                public void mouseReleased(MouseEvent e) { pressed = false; repaint(); }
+            });
+        }
+
+        public void setOutlined(boolean outlined) {
+            this.isOutlined = outlined;
+            setForeground(normalColor);
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color currentBg = pressed ? pressedColor : (hovered ? hoverColor : normalColor);
+
+            if (isOutlined) {
+                if (hovered || pressed) {
+                    g2.setColor(new Color(currentBg.getRed(), currentBg.getGreen(), currentBg.getBlue(), 30));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+                }
+                g2.setColor(normalColor);
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, radius, radius);
+            } else {
+                g2.setColor(currentBg);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            }
+
+            g2.dispose();
+            super.paintComponent(g);
+        }
+
+        private Color brighten(Color c, float fraction) {
+            int r = Math.min(255, (int)(c.getRed() + (255 - c.getRed()) * fraction));
+            int g = Math.min(255, (int)(c.getGreen() + (255 - c.getGreen()) * fraction));
+            int b = Math.min(255, (int)(c.getBlue() + (255 - c.getBlue()) * fraction));
+            return new Color(r, g, b);
+        }
+
+        private Color darken(Color c, float fraction) {
+            int r = Math.max(0, (int)(c.getRed() * (1 - fraction)));
+            int g = Math.max(0, (int)(c.getGreen() * (1 - fraction)));
+            int b = Math.max(0, (int)(c.getBlue() * (1 - fraction)));
+            return new Color(r, g, b);
+        }
+    }
+
+    class ModernTextField extends JTextField {
+        private boolean isFocused = false;
+        private int radius = 8;
+
+        public ModernTextField(int columns) {
+            super(columns);
+            setOpaque(false);
+            setBorder(new EmptyBorder(8, 12, 8, 12));
+            setFont(MAIN_FONT);
+            setForeground(TEXT_COLOR);
+            setCaretColor(ACCENT_BLUE);
+            
+            addFocusListener(new java.awt.event.FocusAdapter() {
+                public void focusGained(java.awt.event.FocusEvent evt) { isFocused = true; repaint(); }
+                public void focusLost(java.awt.event.FocusEvent evt) { isFocused = false; repaint(); }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Color.WHITE);
+            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth() - 1, getHeight() - 1, radius, radius));
+            super.paintComponent(g);
+            g2.dispose();
+        }
+
+        @Override
+        protected void paintBorder(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(isFocused ? ACCENT_BLUE : BORDER_COLOR);
+            g2.setStroke(new BasicStroke(isFocused ? 2f : 1f));
+            g2.draw(new RoundRectangle2D.Float(1, 1, getWidth() - 3, getHeight() - 3, radius, radius));
+            g2.dispose();
+        }
+    }
+
+    class ModernComboBox extends JComboBox<String> {
+        public ModernComboBox(String[] items) {
+            super(items);
+            setFont(MAIN_FONT);
+            setForeground(TEXT_COLOR);
+            setBackground(Color.WHITE);
+            setOpaque(false);
+            
+            setUI(new BasicComboBoxUI() {
+                @Override
+                protected JButton createArrowButton() {
+                    JButton btn = new JButton("▼");
+                    btn.setBorder(new EmptyBorder(0, 5, 0, 5));
+                    btn.setContentAreaFilled(false);
+                    btn.setForeground(TEXT_COLOR);
+                    btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+                    return btn;
+                }
+            });
+            setBorder(new EmptyBorder(5, 10, 5, 10));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Color.WHITE);
+            g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
+            super.paintComponent(g);
+            g2.dispose();
+        }
+
+        @Override
+        protected void paintBorder(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(BORDER_COLOR);
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
+            g2.dispose();
+        }
+    }
+
+    class ModernScrollPane extends JScrollPane {
+        public ModernScrollPane(Component view) {
+            super(view);
+            setBorder(BorderFactory.createEmptyBorder());
+            getViewport().setBackground(CARD_COLOR);
+            
+            getVerticalScrollBar().setUI(new BasicScrollBarUI() {
+                @Override
+                protected void configureScrollBarColors() {
+                    this.thumbColor = new Color(200, 204, 212);
+                    this.trackColor = CARD_COLOR;
+                }
+                @Override
+                protected JButton createDecreaseButton(int orientation) { return createZeroButton(); }
+                @Override
+                protected JButton createIncreaseButton(int orientation) { return createZeroButton(); }
+                private JButton createZeroButton() {
+                    JButton jbutton = new JButton();
+                    jbutton.setPreferredSize(new Dimension(0, 0));
+                    jbutton.setMinimumSize(new Dimension(0, 0));
+                    jbutton.setMaximumSize(new Dimension(0, 0));
+                    return jbutton;
+                }
+                @Override
+                protected void paintThumb(Graphics g, JComponent c, Rectangle thumbBounds) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(thumbColor);
+                    g2.fillRoundRect(thumbBounds.x + 2, thumbBounds.y + 2, thumbBounds.width - 4, thumbBounds.height - 4, 8, 8);
+                    g2.dispose();
+                }
+            });
+            getVerticalScrollBar().setPreferredSize(new Dimension(12, 0));
+        }
     }
 }
